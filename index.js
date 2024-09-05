@@ -32,6 +32,12 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply('You are banned from using this bot.');
     } else {
         switch (commandName) {
+            case 'zap':
+                await zap(interaction, options);
+                break;
+            case 'reward':
+                await reward(interaction, options);
+                break;
             case 'shock':
                 await commandShock(interaction, options);
                 break;
@@ -43,6 +49,9 @@ client.on('interactionCreate', async interaction => {
                 break;
             case 'stats':
                 await commandStats(interaction, options);
+                break;
+            case 'shockstats':
+                await commandShockedStats(interaction, options);
                 break;
             case 'list':
                 await commandList(interaction, options);
@@ -75,6 +84,7 @@ client.on('interactionCreate', async interaction => {
 
 async function triggerPiShock(action, op, visualOp, intensity, duration, username, sharecode) {
     try {
+        console.log(sharecode);
         const data = {
             Op: op,
             intensity: intensity,
@@ -165,9 +175,103 @@ function humanizeDuration(duration) {
     }
 }
 
+function diff_minutes(dt2, dt1)
+{
+    var diffMs = (dt2 - dt1);
+    var diffMins = Math.round(((diffMs % 86400000) % 3600000) / 60000); // minutes
+    return diffMins;
+}
+
+async function zap(interaction, options) {
+    const db = await dbPromise;
+    let sql = "SELECT timestamp, CURRENT_TIMESTAMP datetime_now, (CURRENT_TIMESTAMP - timestamp) timeSinceLastShock";
+    sql = sql + " FROM logs ";
+    sql = sql + " WHERE type IN ('shock') "
+    sql = sql + " and discord_user_id = " + interaction.user.id;
+    sql = sql + " ORDER BY timestamp DESC "
+    sql = sql + " limit 1 ";
+    console.log(sql);
+    const rows = await db.all(sql
+    );
+    var lastShock = null;
+    var now = null;
+    var timeSince = null;
+    for (const row of rows) {
+        try {
+            lastShock = row.timestamp;
+            now = row.datetime_now;
+        } catch (error) {
+            console.error(`Failed to fetch user ${row.pishock_user}:`, error);
+            statsEmbed.addFields({ name: `User ID: ${row.pishock_user}`, value: `Total Duration: ${humanizeDuration(row.total_duration)} seconds (user fetch failed)`, inline: false });
+        }
+    }
+    timeSince = diff_minutes(Date.parse(now), Date.parse(lastShock));
+    console.log(timeSince);
+
+    //Ciri Override!
+    //Ciri - 237329582561165313
+    //Liliana - 189911161091784704
+    if ((timeSince < 10) && (interaction.user.id != "237329582561165313")) {
+        await interaction.reply('MEAN! At least give them a chance to breathe! (wait 10 minutes... give poor sub a break)');
+        return;
+    }
+
+    const intensity = 20;
+    const duration = 1;
+    const user = options.getString('user');
+    if (intensity < 1 || intensity > 100) {
+        await interaction.reply('Intensity must be between 1 and 100.');
+        return;
+    }
+
+    if (duration < 1 || duration > 15) {
+        await interaction.reply('Duration must be between 1 and 15.');
+        return;
+    }
+    console.log(user);
+
+    if (user === 'all' || !user) {
+        //Shocking poor poor Liliana...
+        let found = false;
+        for (const pishock_user of config.pishock_users) {
+            if (pishock_user.pishockUsername === "Liliana") {
+                let shockIntensity = Math.min(intensity, pishock_user.max_shock_intensity);
+                let shockDuration = Math.min(duration, pishock_user.max_shock_duration);
+                const response = "PLS STOP!";
+                await triggerPiShock('beep', 2, 'Beeping', 1, duration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                logAction(interaction.user.id, 'shock', shockIntensity, shockDuration, pishock_user.pishockUsername);
+                var delayInMilliseconds = 10000; //1 second
+    
+                setTimeout(function() {
+                    //your code to be executed after 1 second
+                    triggerPiShock('shock', 0, 'Shocking', shockIntensity, shockDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                }, delayInMilliseconds);
+                await interaction.reply(response);
+                found = true;
+            }
+        }
+    } else {
+        let found = false;
+        for (const pishock_user of config.pishock_users) {
+            if (pishock_user.pishockUsername === user) {
+                let shockIntensity = Math.min(intensity, pishock_user.max_shock_intensity);
+                let shockDuration = Math.min(duration, pishock_user.max_shock_duration);
+                const response = await triggerPiShock('shock', 0, 'Shocking', shockIntensity, shockDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                await interaction.reply(response);
+                logAction(interaction.user.id, 'shock', shockIntensity, shockDuration, pishock_user.pishockUsername);
+                found = true;
+            }
+        }
+
+        if (!found) {
+            await interaction.reply('User not found.');
+        }
+    }
+}
+
 async function commandShock(interaction, options) {
-    const intensity = options.getInteger('intensity') ?? 1;
-    const duration = options.getInteger('duration');
+    const intensity = 20;
+    const duration = 1;
     const user = options.getString('user');
     if (intensity < 1 || intensity > 100) {
         await interaction.reply('Intensity must be between 1 and 100.');
@@ -184,8 +288,14 @@ async function commandShock(interaction, options) {
         for (const pishock_user of config.pishock_users) {
             let shockIntensity = Math.min(intensity, pishock_user.max_shock_intensity);
             let shockDuration = Math.min(duration, pishock_user.max_shock_duration);
-            await triggerPiShock('shock', 0, 'Shocking', shockIntensity, shockDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+            await triggerPiShock('beep', 2, 'Beeping', 1, duration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
             logAction(interaction.user.id, 'shock', shockIntensity, shockDuration, pishock_user.pishockUsername);
+            var delayInMilliseconds = 10000; //1 second
+
+            setTimeout(function() {
+                //your code to be executed after 1 second
+                triggerPiShock('shock', 0, 'Shocking', shockIntensity, shockDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+            }, delayInMilliseconds);
         }
 
         await interaction.reply(`Shocking **everyone** with intensity ${intensity} and a duration of ${duration}!`);
@@ -198,6 +308,53 @@ async function commandShock(interaction, options) {
                 const response = await triggerPiShock('shock', 0, 'Shocking', shockIntensity, shockDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
                 await interaction.reply(response);
                 logAction(interaction.user.id, 'shock', shockIntensity, shockDuration, pishock_user.pishockUsername);
+                found = true;
+            }
+        }
+
+        if (!found) {
+            await interaction.reply('User not found.');
+        }
+    }
+}
+
+async function reward(interaction, options) {
+    const intensity = 100;
+    const duration = 4;
+    const user = options.getString('user');
+    if (intensity < 1 || intensity > 100) {
+        await interaction.reply('Intensity must be between 1 and 100.');
+        return;
+    }
+
+    if (duration < 1 || duration > 15) {
+        await interaction.reply('Duration must be between 1 and 15.');
+        return;
+    }
+
+    if (!user) {
+        // Reward Liliana!
+        for (const pishock_user of config.pishock_users) {
+            if (pishock_user.pishockUsername === "Liliana") {
+                let vibrateIntensity = Math.min(intensity, pishock_user.max_vibrate_intensity);
+                let vibrateDuration = Math.min(duration, pishock_user.max_vibrate_duration);
+                await triggerPiShock('beep', 2, 'Beeping', 1, duration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                await triggerPiShock('vibrate', 1, 'Vibrating', vibrateIntensity, vibrateDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                
+                logAction(interaction.user.id, 'vibrate', vibrateIntensity, vibrateDuration, pishock_user.pishockUsername);
+            }
+        }
+
+        await interaction.reply(`LILIANA GETS A TREAT?!?`);
+    } else {
+        let found = false;
+        for (const pishock_user of config.pishock_users) {
+            if (pishock_user.pishockUsername === user) {
+                let vibrateIntensity = Math.min(intensity, pishock_user.max_vibrate_intensity);
+                let vibrateDuration = Math.min(duration, pishock_user.max_vibrate_duration);
+                const response = await triggerPiShock('vibrate', 1, 'Vibrating', vibrateIntensity, vibrateDuration, pishock_user.pishockUsername, pishock_user.pishockShareCode);
+                await interaction.reply(response);
+                logAction(interaction.user.id, 'vibrate', vibrateIntensity, vibrateDuration, pishock_user.pishockUsername);
                 found = true;
             }
         }
@@ -285,13 +442,49 @@ async function commandBeep(interaction, options) {
     }
 }
 
+async function commandShockedStats(interaction, options) {
+    try {
+        const db = await dbPromise;
+        const rows = await db.all(
+            `SELECT pishock_user, SUM(duration) as total_duration
+                 FROM logs
+                 WHERE type IN ('shock')
+                 GROUP BY pishock_user
+                 ORDER BY total_duration DESC
+                     LIMIT 10`
+        );
+
+        // Creating an embed
+        const statsEmbed = new EmbedBuilder()
+            .setColor(0x0099ff) // Use a hexadecimal color
+            .setTitle('Top 10 Users: Shock Duration')
+            .setDescription('Users with the most total time spent shocking poor saps. Number 1 will shock you! LITERALLY!')
+            .setTimestamp();
+
+        for (const row of rows) {
+            try {
+                const user = await client.users.fetch(row.pishock_user);
+                statsEmbed.addFields({ name: `User: ${userName}`, value: `Total Duration: ${humanizeDuration(row.total_duration)}`, inline: false });
+            } catch (error) {
+                console.error(`Failed to fetch user ${row.pishock_user}:`, error);
+                statsEmbed.addFields({ name: `User ID: ${row.pishock_user}`, value: `Total Duration: ${humanizeDuration(row.total_duration)} seconds (user fetch failed)`, inline: false });
+            }
+        }
+
+        await interaction.reply({ embeds: [statsEmbed] });
+    } catch (error) {
+        console.error('Failed to retrieve stats:', error);
+        await interaction.reply('Failed to retrieve stats.');
+    }
+}
+
 async function commandStats(interaction, options) {
     try {
         const db = await dbPromise;
         const rows = await db.all(
             `SELECT discord_user_id, SUM(duration) as total_duration
                  FROM logs
-                 WHERE type IN ('shock', 'vibrate')
+                 WHERE type IN ('shock')
                  GROUP BY discord_user_id
                  ORDER BY total_duration DESC
                      LIMIT 10`
@@ -300,8 +493,8 @@ async function commandStats(interaction, options) {
         // Creating an embed
         const statsEmbed = new EmbedBuilder()
             .setColor(0x0099ff) // Use a hexadecimal color
-            .setTitle('Top 10 Users: Shock & Vibrate Duration')
-            .setDescription('Users with the most total time spent using shock and vibrate commands')
+            .setTitle('Top 10 Users: Shock Duration')
+            .setDescription('Users with the most total time spent shocking poor saps. Number 1 will shock you! LITERALLY!')
             .setTimestamp();
 
         for (const row of rows) {
@@ -349,9 +542,10 @@ async function commandAdd(interaction, options) {
 
     // Check if the admin is adding a user
     if (interaction.commandName === 'adminadd') {
-        const admin = interaction.member;
-        if (!admin.roles.cache.some(role => role.id === config.discordAdminRoleId)) {
-            await interaction.reply('You must be an admin to use this command.');
+        //Liliana's Id
+        const admin = interaction.user.id;
+        if (admin !== "189911161091784704") {
+            await interaction.reply('You must be Liliana to use this command. RIP Bozo');
             return;
         }
     }
@@ -394,9 +588,9 @@ async function commandRemove(interaction, options) {
 
     // Check if the admin is adding a user
     if (interaction.commandName === 'adminremove') {
-        const admin = interaction.member;
-        if (!admin.roles.cache.some(role => role.id === config.discordAdminRoleId)) {
-            await interaction.reply('You must be an admin to use this command.');
+        const admin = interaction.user.id;
+        if (admin !== "189911161091784704") {
+            await interaction.reply('You must be Liliana to use this command. RIP Bozo');
             return;
         }
     }
@@ -452,9 +646,9 @@ async function commandShockBan(interaction, options) {
     const user = options.getUser('username');
 
     // Check if the admin is adding a user
-    const admin = interaction.member;
-    if (!admin.roles.cache.some(role => role.id === config.discordAdminRoleId)) {
-        await interaction.reply('You must be an admin to use this command.');
+    const admin = interaction.user.id;
+    if (admin !== "189911161091784704") {
+        await interaction.reply('You must be Liliana to use this command. RIP Bozo');
         return;
     }
 
@@ -486,9 +680,9 @@ async function commandShockUnban(interaction, options) {
     const user = options.getUser('username');
 
     // Check if the admin is adding a user
-    const admin = interaction.member;
-    if (!admin.roles.cache.some(role => role.id === config.discordAdminRoleId)) {
-        await interaction.reply('You must be an admin to use this command.');
+    const admin = interaction.user.id;
+    if (admin !== "189911161091784704") {
+        await interaction.reply('You must be Liliana to use this command. RIP Bozo');
         return;
     }
 
@@ -566,5 +760,6 @@ async function commandConfig(interaction, options) {
     }
 
 }
-
+console.log(config.discordToken);
+console.log(config.discordClientId);
 client.login(config.discordToken);

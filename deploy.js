@@ -4,19 +4,9 @@ const { discordClientId, discordGuildId, discordToken } = require('./config.json
 
 const commands = [
     {
-        name: 'shock',
-        description: 'Activate the shock with a specified intensity and duration (optional: user)',
+        name: 'zap',
+        description: 'Zaps poor poor Liliana... (or pick someone else... PLEASE? PRETTY PLEASE???)',
         options: [{
-            name: 'intensity',
-            type: 4,
-            description: 'The intensity of the shock (1-100)',
-            required: true,
-        }, {
-            name: 'duration',
-            type: 4,
-            description: 'The duration of the shock (1-15)',
-            required: true,
-        }, {
             name: 'user',
             type: 3,
             description: 'The user to shock (optional)',
@@ -24,22 +14,12 @@ const commands = [
         }],
     },
     {
-        name: 'vibrate',
-        description: 'Activate vibration with a specified intensity',
+        name: 'reward',
+        description: 'Buzzes Liliana... (or pick someone else... But do not do that. Reward Liliana. She is a good girl.)',
         options: [{
-            name: 'intensity',
-            type: 4,
-            description: 'The intensity of the vibration (1-100)',
-            required: true,
-        }, {
-            name: 'duration',
-            type: 4,
-            description: 'The duration of the vibration (1-15)',
-            required: true,
-        }, {
             name: 'user',
             type: 3,
-            description: 'The user to vibrate (optional)',
+            description: 'The user to buzz (optional)',
             required: false,
         }],
     },
@@ -129,6 +109,10 @@ const commands = [
     },
     {
         name: 'stats',
+        description: 'Get stats about the top 10 users',
+    },
+    {
+        name: 'shockstats',
         description: 'Get stats about the top 10 users',
     },
     {
